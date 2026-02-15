@@ -3,5 +3,8 @@ __pycache__/
 .env
 .venv/
 .ipynb_checkpoints/
-data/
+/data/
 wandb/
+experiments/
+results/
+__init__.py

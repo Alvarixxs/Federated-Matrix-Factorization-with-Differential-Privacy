@@ -5,76 +5,45 @@ from typing import Dict, List, Tuple
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
-from configs.clientConfig import ClientConfig
+from dataclasses import dataclass
 
 
-class fedClient:
-    """
-    """
+@dataclass
+class ClientConfig:
+    k: int
+    lr: float
+    local_epochs: int
+    batch_size: int
+    reg: float  # L2 regularization strength
+    
 
+class FLClient:
     def __init__(
         self,
         user_id: int,
         cfg: ClientConfig,
         device: torch.device,
-        user_data: List[Tuple[int, float]],
-        test_frac: float,
-    ) -> None:
-        """
-        """
+    ) :
         self.user_id = user_id
         self.cfg = cfg
         self.device = device
-
-        self.train_data, self.test_data = self._split_data(user_data, test_frac)
 
         # Local user parameters (persist)
         self.p_u = (0.01 * torch.randn(self.cfg.k, device=self.device))
         self.b_u = torch.tensor(0.0, device=self.device)
 
-    # -----------------------------
-    # Data handling (client-owned)
-    # -----------------------------
-    def _split_data(
-        self,
-        user_data: List[Tuple[int, float]],
-        test_frac: float,
-    ) -> Tuple[List[Tuple[int, float]], List[Tuple[int, float]]]:
-        """
-        """
-        random.shuffle(user_data)
-        n = len(user_data)
-
-        if n <= 1:
-            return user_data, []
-
-        n_test = max(1, int(test_frac * n))
-        test = user_data[:n_test]
-        train = user_data[n_test:]
-
-        return train, test
-    
-    def compute_sum_train(self) -> Tuple[float, int]:
-        """
-        """
-        return sum(r for (_, r) in self.train_data), len(self.train_data)
-
-    # -----------------------------
-    # Local training (uses ONLY train split)
-    # -----------------------------
     def local_train(
         self,
         mu: float,
         Q_items: torch.Tensor,
         bi_items: torch.Tensor,
-    ) -> Dict[int, Tuple[torch.Tensor, torch.Tensor]]:
-        """ 
-        """
-        if len(self.train_data) == 0:
+        training_data: List[Tuple[int, float]]
+    ):
+        if len(training_data) == 0:
             return {}
 
         # Items this client touched
-        items = sorted(set(i for (i, _) in self.train_data))
+        items = sorted(set(i for (i, _) in training_data))
         item_pos = {item_id: t for t, item_id in enumerate(items)}
 
         # Local copies of touched item params
@@ -86,9 +55,9 @@ class fedClient:
         b_u = self.b_u.clone().detach().requires_grad_(True)
 
         # Build local dataset
-        ii = torch.tensor([item_pos[i] for (i, _) in self.train_data],
+        ii = torch.tensor([item_pos[i] for (i, _) in training_data],
                           device=self.device, dtype=torch.long)
-        rr = torch.tensor([r for (_, r) in self.train_data],
+        rr = torch.tensor([r for (_, r) in training_data],
                           device=self.device, dtype=torch.float32)
 
         loader = DataLoader(
@@ -141,28 +110,3 @@ class fedClient:
                 uploads[item_id] = (delta_Q[t].detach().clone(), delta_bi[t].detach().clone())
 
         return uploads
-
-    # -----------------------------
-    # Prediction / evaluation
-    # -----------------------------
-    @torch.no_grad()
-    def _predict_one(self, mu: float, bi: torch.Tensor, q_i: torch.Tensor) -> float:
-        """
-        """
-        mu_t = torch.tensor(mu, device=self.device, dtype=torch.float32)
-        pred = mu_t + self.b_u + bi + torch.dot(self.p_u, q_i)
-
-        return float(pred)
-
-    @torch.no_grad()
-    def sum_squared_error(self, split: str, mu: float, Q_items: torch.Tensor, bi_items: torch.Tensor) -> Tuple[float, int]:
-        """
-        """
-        data = self.train_data if split == "train" else self.test_data
-
-        se = 0.0
-        for (i, r) in data:
-            pred = self._predict_one(mu, bi_items[i], Q_items[i])
-            se += (pred - r) ** 2
-
-        return se, len(data)
