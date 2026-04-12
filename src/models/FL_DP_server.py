@@ -36,6 +36,7 @@ class FLDPServer:
     def aggregate_item_updates(
         self,
         updates_list: List[Dict[int, Tuple[torch.Tensor, torch.Tensor]]],
+        round_seed
     ):
         m = len(updates_list)
         if m == 0:
@@ -72,8 +73,17 @@ class FLDPServer:
 
         sensitivity = self.dp_cfg.clip_norm / m
         noise_std = self.dp_cfg.noise_multiplier * sensitivity
-        noise = torch.randn_like(w_avg) * noise_std
+
+        w_avg_clean = w_avg.clone()
+
+        generator = torch.Generator()
+        generator.manual_seed(round_seed)
+        noise = torch.randn(w_avg.shape, generator=generator) * noise_std
         w_update = w_avg + noise
+
+        print(f"||noise||: {torch.norm(noise).item():.4f}")
+        print(f"||w_avg||: {torch.norm(w_avg_clean).item():.4f}")
+        print(f"ratio noise/signal: {torch.norm(noise).item() / torch.norm(w_avg_clean).item():.4f}")
 
         with torch.no_grad():
             w = w + w_update
@@ -90,21 +100,20 @@ class FLDPServer:
         )
 
 
-    def train(self, clients, training_data):
-        training_data = {u: [(i, r) for (u_, i, r) in training_data if u_ == u] for u in range(len(clients))}
-        self.mu = sum(r for (_, r) in training_data[0]) / max(len(training_data[0]), 1)
+    def train(self, clients, training_data_per_user):
+        self.mu = sum(r for (_, r) in sum(training_data_per_user.values(), [])) / max(sum(len(v) for v in training_data_per_user.values()), 1)
 
-        for _ in range(1,  self.cfg.rounds + 1):
+        for t in range(1,  self.cfg.rounds + 1):
+            random.seed(42 + t)
             selected = self._sample_clients(clients)
             updates_list = []
-
             for client in selected:
                 uploads = client.local_train(
                     mu=self.mu,
                     Q_items=self.Q,
                     bi_items=self.bi,
-                    training_data=training_data[client.user_id]
+                    training_data=training_data_per_user[client.user_id]
                 )
                 updates_list.append(uploads)
 
-            self.aggregate_item_updates(updates_list)
+            self.aggregate_item_updates(updates_list, round_seed=42+t)

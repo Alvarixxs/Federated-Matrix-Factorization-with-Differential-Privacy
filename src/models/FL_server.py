@@ -1,5 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
+import json
+import os
 import random
 from typing import Dict, List, Tuple
 
@@ -65,11 +67,36 @@ class FLServer:
 
             self.Q = new_Q_flat.reshape_as(self.Q)
             self.bi = new_b_flat.reshape_as(self.bi)
-        
-    def train(self, clients, training_data_per_user, training_data):
+
+    def _compute_rmse(self, clients, mu, data):
+        with torch.no_grad():
+            squared_errors = []
+            client_map = {c.user_id: c for c in clients}
+
+            for user_id, item_id, rating in data:
+                if user_id not in client_map:
+                    continue
+                client = client_map[user_id]
+                pred = (
+                    mu
+                    + client.b_u
+                    + self.bi[item_id]
+                    + client.p_u.dot(self.Q[item_id])
+                ).item()
+                squared_errors.append((pred - rating) ** 2)
+
+        return (sum(squared_errors) / len(squared_errors)) ** 0.5 if squared_errors else float('inf')
+
+    def train(self, clients, training_data_per_user, val_data=None):
         self.mu = sum(r for (_, r) in sum(training_data_per_user.values(), [])) / max(sum(len(v) for v in training_data_per_user.values()), 1)
 
-        for _ in range(1,  self.cfg.rounds + 1):
+        # Construir lista plana de datos de entrenamiento para RMSE
+        train_data = [(u, i, r) for u, interactions in training_data_per_user.items() for (i, r) in interactions]
+
+        history_train = []
+        history_val = []
+
+        for t in range(1, self.cfg.rounds + 1):
             selected = self._sample_clients(clients)
             updates_list = []
 
@@ -83,3 +110,11 @@ class FLServer:
                 updates_list.append(uploads)
 
             self.aggregate_item_updates(updates_list)
+
+            if val_data is not None:
+                rmse_train = self._compute_rmse(clients, self.mu, train_data)
+                rmse_val = self._compute_rmse(clients, self.mu, val_data)
+                history_train.append(rmse_train)
+                history_val.append(rmse_val)
+
+        return history_train, history_val

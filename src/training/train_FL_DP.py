@@ -45,11 +45,19 @@ def main(args):
         n_items=n_items
     )
 
-    server.train(clients, training_data)
+    training_data_per_user = {}
+
+    for u, i, r in training_data:
+        training_data_per_user.setdefault(u, []).append((i, r))
+
+    print(f"Entrenando FL_DP en {args.dataset} (k={args.k}, lr={args.lr}, reg={args.reg}, rounds={args.rounds}, local_epochs={args.local_epochs}, noise_multiplier={args.noise_multiplier})")
+    server.train(clients, training_data_per_user)
+
     P, bu = reconstruct_user_factors(clients, args.k, torch.device("cpu"))
     base_path = build_base_path(args, "FL_DP")
     save_model(base_path, P, server.Q, bu, server.bi, server.mu, args, accountant=server.accountant)
 
+    print(f"Entrenamiento completado. Modelo guardado en {base_path}")
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()

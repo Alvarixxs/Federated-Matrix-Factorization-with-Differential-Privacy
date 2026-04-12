@@ -69,7 +69,7 @@ def main(args):
     
     train_df, test_df = load_mia_dataset(base_path)
 
-    features = ["score", "error", "norm_p", "norm_q"]
+    features = ["score", "error", "squared_error", "norm_p", "norm_q", "reg_loss", "centered_score"]
 
     X_train = torch.tensor(train_df[features].values, dtype=torch.float32, device=device)
     y_train = torch.tensor(train_df["label"].values, dtype=torch.float32, device=device)

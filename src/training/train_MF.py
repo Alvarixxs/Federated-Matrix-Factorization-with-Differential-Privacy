@@ -1,20 +1,20 @@
 import argparse
+import json
 import os
 import torch
 
-from src.models.MF import MF
-from src.models.MF import MFConfig
+from src.models.MF import MF, MFConfig
 from src.utils.seeding import set_seed
-from src.utils.data import load_training_data, load_metadata
+from src.utils.data import load_training_data, load_val_data, load_metadata
 from src.utils.training import save_model
 from src.utils.experiments import build_base_path
 
 
 def main(args):
-
     set_seed(args.seed)
 
     training_data = load_training_data(args.dataset)
+    val_data = load_val_data(args.dataset)
     metadata = load_metadata(args.dataset)
     n_users = metadata['n_users']
     n_items = metadata['n_items']
@@ -27,16 +27,23 @@ def main(args):
         rounds=args.rounds
     )
 
-    server = MF(
+    model = MF(
         n_users=n_users,
         n_items=n_items,
         cfg=cfg,
         device=torch.device("cpu"),
     )
 
-    server.train(training_data)
+    print(f"Entrenando MF en {args.dataset} (k={args.k}, lr={args.lr}, reg={args.reg}, rounds={args.rounds})")
+    history_train, history_val = model.train(training_data, val_data)
+
     base_path = build_base_path(args, "MF")
-    save_model(base_path, server.P, server.Q, server.bu, server.bi, server.mu, args)
+    save_model(base_path, model.P, model.Q, model.bu, model.bi, model.mu, args)
+    
+    with open(os.path.join(base_path, "history.json"), "w") as f:
+        json.dump({"rmse_train": history_train, "rmse_val": history_val}, f, indent=4)
+
+    print(f"Entrenamiento completado. Modelo guardado en {base_path}")
 
 
 if __name__ == "__main__":

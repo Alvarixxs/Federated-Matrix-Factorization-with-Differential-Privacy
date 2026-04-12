@@ -8,3 +8,4 @@ wandb/
 experiments/
 results/
 __init__.py
+latex/

@@ -9,6 +9,12 @@ def load_training_data(dataset):
     return list(df[['user_id','item_id','rating']].itertuples(index=False, name=None))
 
 
+def load_val_data(dataset):
+    csv_path = os.path.join("data", dataset, "splits", "val_model.csv")
+    df = pd.read_csv(csv_path)
+    return list(df[['user_id','item_id','rating']].itertuples(index=False, name=None))
+
+
 def load_test_data(dataset):
     csv_path = os.path.join("data", dataset, "splits", "test_model.csv")
     df = pd.read_csv(csv_path)

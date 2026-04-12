@@ -11,22 +11,23 @@ from src.utils.evaluation import save_mia_features
 # Feature computation
 # -------------------------------------------------
 
-def compute_features(P, Q, bu, bi, mu, data, label):
+def compute_features(P, Q, bu, bi, mu, data, label, reg):
     rows = []
 
     for user_id, item_id, rating in data:
-        pred = (
-            mu
-            + bu[user_id]
-            + bi[item_id]
-            + P[user_id].dot(Q[item_id])
-        ).item()
+        p = P[user_id]
+        q = Q[item_id]
+
+        pred = (mu + bu[user_id] + bi[item_id] + p.dot(q)).item()
 
         error = abs(pred - rating)
-        norm_p = torch.norm(P[user_id]).item()
-        norm_q = torch.norm(Q[item_id]).item()
+        squared_error = (pred - rating) ** 2
+        norm_p = torch.norm(p).item()
+        norm_q = torch.norm(q).item()
+        reg_loss = squared_error + reg * (norm_p**2 + norm_q**2)
+        centered_score = (pred - mu - bu[user_id].item())
 
-        rows.append([pred, error, norm_p, norm_q, label])
+        rows.append([pred, error, squared_error, norm_p, norm_q, reg_loss, centered_score, label])
 
     return rows
 
@@ -48,7 +49,8 @@ def main(args):
     features_in = compute_features(
         P, Q, bu, bi, mu,
         mia_in_data,
-        label=1
+        label=1,
+        reg=args.reg
     )
     save_mia_features(base_path, features_in, split="mia_in")
 
@@ -59,7 +61,8 @@ def main(args):
     features_out = compute_features(
         P, Q, bu, bi, mu,
         mia_out_data,
-        label=0
+        label=0,
+        reg=args.reg
     )
     save_mia_features(base_path, features_out, split="mia_out")
 

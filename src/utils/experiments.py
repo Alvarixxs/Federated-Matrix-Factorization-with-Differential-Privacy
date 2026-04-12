@@ -1,4 +1,3 @@
-
 import os
 
 
@@ -11,6 +10,8 @@ def build_base_path(args, model):
         f"reg{args.reg}_"
         f"bs{args.batch_size}_"
         f"r{args.rounds}",
+        f"seed{args.seed}",
         model,
+        f"le{args.local_epochs}" if model in ("FL", "FL_DP") else "",
         f"noise{args.noise_multiplier}" if model == "FL_DP" else ""
     )
