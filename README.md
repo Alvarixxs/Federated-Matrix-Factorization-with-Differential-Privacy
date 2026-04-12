@@ -1,14 +1,61 @@
-# Federated MF with Differential Privacy and MIA
+# Federated Matrix Factorization with Differential Privacy
 
-Pipeline:
+Implementation of a federated recommender system based on Matrix Factorization (MF) with Differential Privacy (DP) guarantees, developed as part of an undergraduate thesis at Universidad Autónoma de Madrid.
 
-1. Train MF model
-2. Evaluate RMSE
-3. Extract scores for MIA
-4. Build attack dataset
-5. Train attack classifier
+## Models
 
-Everything is script-based and reproducible via seeds.
+- **MF**: Centralized Matrix Factorization baseline
+- **FL**: Federated Matrix Factorization
+- **FL-DP**: Federated Matrix Factorization with Differential Privacy (Gaussian mechanism + RDP accounting)
 
+## Datasets
 
-{'model': 'FedDP_MF', 'k': 64, 'lr': 0.05, 'local_epochs': 16, 'rounds': 80, 'sample_rate': 0.1, 'batch_size': 16, 'reg': 0.01, 'clip_norm': 1.0, 'noise_multiplier': 0.0, 'seed': 0, 'test_frac': 0.2, 'delta': 1e-06}
+Experiments are conducted on [MovieLens 100K](https://grouplens.org/datasets/movielens/100k/) and [MovieLens 1M](https://grouplens.org/datasets/movielens/1m/).
+
+## Pipeline
+
+1. Create data splits
+2. Hyperparameter search
+3. Train models
+4. Evaluate RMSE and privacy budget ε
+
+All experiments are reproducible via seeds.
+
+## Requirements
+
+```bash
+pip install -r requirements.txt
+```
+
+## Usage
+
+```bash
+# Create splits
+./scripts/splits/run_splits.sh
+
+# Hyperparameter search
+./scripts/search/run_hparam_search.sh
+
+# Train
+./scripts/model/run_training.sh
+
+# Evaluate
+./scripts/model/run_evaluations.sh
+```
+
+## Project Structure
+
+```
+src/
+├── models/       # MF, FL and FL-DP model implementations
+├── training/     # Training scripts
+├── evaluation/   # RMSE evaluation
+├── plots/        # Result visualization
+├── data/         # Data loading and splitting
+└── utils/        # Shared utilities
+scripts/
+├── splits/       # Data split scripts
+├── search/       # Hyperparameter search scripts
+├── model/        # Training and evaluation scripts
+└── plots/        # Plot generation scripts
+```
