@@ -71,27 +71,41 @@ class FLServer:
     def _compute_rmse(self, clients, mu, data):
         with torch.no_grad():
             squared_errors = []
-            client_map = {c.user_id: c for c in clients}
+            # Mapear user_id -> (p_u, b_u) desde los clientes
+            user_map = {}
+            for c in clients:
+                for u in c.user_ids:
+                    user_map[u] = (c.p_u[u], c.b_u[u])
 
             for user_id, item_id, rating in data:
-                if user_id not in client_map:
+                if user_id not in user_map:
                     continue
-                client = client_map[user_id]
+                p_u, b_u = user_map[user_id]
                 pred = (
                     mu
-                    + client.b_u
+                    + b_u
                     + self.bi[item_id]
-                    + client.p_u.dot(self.Q[item_id])
+                    + p_u.dot(self.Q[item_id])
                 ).item()
                 squared_errors.append((pred - rating) ** 2)
 
         return (sum(squared_errors) / len(squared_errors)) ** 0.5 if squared_errors else float('inf')
 
-    def train(self, clients, training_data_per_user, val_data=None):
-        self.mu = sum(r for (_, r) in sum(training_data_per_user.values(), [])) / max(sum(len(v) for v in training_data_per_user.values()), 1)
+    def train(self, clients, training_data_per_client, val_data=None):
+        # Calcular mu sobre todas las interacciones de todos los clientes
+        all_interactions = []
+        for cid, user_data in training_data_per_client.items():
+            for u, interactions in user_data.items():
+                all_interactions.extend(interactions)
+
+        self.mu = sum(r for (_, r) in all_interactions) / max(len(all_interactions), 1)
 
         # Construir lista plana de datos de entrenamiento para RMSE
-        train_data = [(u, i, r) for u, interactions in training_data_per_user.items() for (i, r) in interactions]
+        train_data = []
+        for cid, user_data in training_data_per_client.items():
+            for u, interactions in user_data.items():
+                for (i, r) in interactions:
+                    train_data.append((u, i, r))
 
         history_train = []
         history_val = []
@@ -105,7 +119,7 @@ class FLServer:
                     mu=self.mu,
                     Q_items=self.Q,
                     bi_items=self.bi,
-                    training_data=training_data_per_user[client.user_id]
+                    training_data=training_data_per_client[client.client_id]
                 )
                 updates_list.append(uploads)
 

@@ -128,6 +128,8 @@ def main(args):
         "train_size": len(train_df),
         "val_size": len(val_df),
         "test_size": len(test_df),
+        "avg_interactions_per_user": round(len(df) / df['user_id'].nunique(), 2),
+        "avg_train_interactions_per_user": round(len(train_df) / df['user_id'].nunique(), 2),
     }
 
     os.makedirs(os.path.join("data", args.dataset, "metadata"), exist_ok=True)

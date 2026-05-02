@@ -50,19 +50,18 @@ def load_model(load_path):
     return P, Q, bu, bi, mu, accountant
 
 
-
 def reconstruct_user_factors(
     clients: List,
     k: int,
     device: torch.device,
+    n_users: int,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
-    n_users = len(clients)
-
     P = torch.zeros(n_users, k, device=device)
     bu = torch.zeros(n_users, device=device)
 
     for client in clients:
-        P[client.user_id] = client.p_u.detach()
-        bu[client.user_id] = client.b_u.detach()
+        for u in client.user_ids:
+            P[u] = client.p_u[u].detach()
+            bu[u] = client.b_u[u].detach()
 
     return P, bu

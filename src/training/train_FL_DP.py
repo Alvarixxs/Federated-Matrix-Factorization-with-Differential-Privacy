@@ -1,5 +1,6 @@
 import argparse
 import os
+import random
 import torch
 
 from src.models.FL_DP_server import DPConfig, FLDPServer, ServerConfig
@@ -10,6 +11,18 @@ from src.utils.training import reconstruct_user_factors, save_model
 from src.utils.experiments import build_base_path
 
 
+def assign_users_to_clients(n_users: int, n_clients: int, seed: int):
+    random.seed(seed)
+    user_ids = list(range(n_users))
+    random.shuffle(user_ids)
+
+    clients_users = [[] for _ in range(n_clients)]
+    for i, u in enumerate(user_ids):
+        clients_users[i % n_clients].append(u)
+
+    return clients_users
+
+
 def main(args):
     set_seed(args.seed)
 
@@ -18,9 +31,14 @@ def main(args):
     n_users = metadata['n_users']
     n_items = metadata['n_items']
 
+    n_clients = args.n_clients if args.n_clients is not None else n_users
+
+    clients_users = assign_users_to_clients(n_users, n_clients, args.seed)
+
     clients = [
         FLClient(
-            user_id=user_id,
+            client_id=cid,
+            user_ids=user_list,
             cfg=ClientConfig(
                 k=args.k,
                 local_epochs=args.local_epochs,
@@ -29,7 +47,8 @@ def main(args):
                 reg=args.reg,
             ),
             device=torch.device("cpu"),
-    ) for user_id in range(n_users)]
+        ) for cid, user_list in enumerate(clients_users)
+    ]
 
     server = FLDPServer(
         cfg=ServerConfig(
@@ -46,18 +65,22 @@ def main(args):
     )
 
     training_data_per_user = {}
-
     for u, i, r in training_data:
         training_data_per_user.setdefault(u, []).append((i, r))
 
-    print(f"Entrenando FL_DP en {args.dataset} (k={args.k}, lr={args.lr}, reg={args.reg}, rounds={args.rounds}, local_epochs={args.local_epochs}, noise_multiplier={args.noise_multiplier})")
-    server.train(clients, training_data_per_user)
+    training_data_per_client = {}
+    for cid, user_list in enumerate(clients_users):
+        training_data_per_client[cid] = {u: training_data_per_user.get(u, []) for u in user_list}
 
-    P, bu = reconstruct_user_factors(clients, args.k, torch.device("cpu"))
+    print(f"Entrenando FL_DP en {args.dataset} (k={args.k}, lr={args.lr}, reg={args.reg}, rounds={args.rounds}, local_epochs={args.local_epochs}, noise_multiplier={args.noise_multiplier}, n_clients={n_clients})")
+    server.train(clients, training_data_per_client)
+
+    P, bu = reconstruct_user_factors(clients, args.k, torch.device("cpu"), n_users)
     base_path = build_base_path(args, "FL_DP")
     save_model(base_path, P, server.Q, bu, server.bi, server.mu, args, accountant=server.accountant)
 
     print(f"Entrenamiento completado. Modelo guardado en {base_path}")
+
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
@@ -71,6 +94,7 @@ if __name__ == "__main__":
     ap.add_argument("--batch_size", type=int, default=64)
     ap.add_argument("--reg", type=float, default=1e-3)
     ap.add_argument("--rounds", type=int, default=30)
+    ap.add_argument("--n_clients", type=int, default=None)
 
     ap.add_argument("--sample_rate", type=float, default=0.1)
 

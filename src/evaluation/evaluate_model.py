@@ -51,6 +51,7 @@ if __name__ == "__main__":
     ap.add_argument("--batch_size", type=int, required=True)
     ap.add_argument("--reg", type=float, required=True)
     ap.add_argument("--rounds", type=int, required=True)
+    ap.add_argument("--n_clients", type=int, default=None)
 
     ap.add_argument("--noise_multiplier", type=float)
     ap.add_argument("--delta", type=float)

@@ -14,8 +14,8 @@ class ServerConfig:
 
 @dataclass
 class DPConfig:
-    clip_norm: float # L2 clipping bound (user-level = one client)
-    noise_multiplier: float # Gaussian noise multiplier (std = noise_multiplier * clip_norm)
+    clip_norm: float
+    noise_multiplier: float
 
 
 class FLDPServer:
@@ -70,20 +70,13 @@ class FLDPServer:
 
         w_avg = w_sum / m
 
-
-        sensitivity = self.dp_cfg.clip_norm / m
+        sensitivity = 2 * self.dp_cfg.clip_norm / m
         noise_std = self.dp_cfg.noise_multiplier * sensitivity
-
-        w_avg_clean = w_avg.clone()
 
         generator = torch.Generator()
         generator.manual_seed(round_seed)
         noise = torch.randn(w_avg.shape, generator=generator) * noise_std
         w_update = w_avg + noise
-
-        print(f"||noise||: {torch.norm(noise).item():.4f}")
-        print(f"||w_avg||: {torch.norm(w_avg_clean).item():.4f}")
-        print(f"ratio noise/signal: {torch.norm(noise).item() / torch.norm(w_avg_clean).item():.4f}")
 
         with torch.no_grad():
             w = w + w_update
@@ -100,11 +93,16 @@ class FLDPServer:
         )
 
 
-    def train(self, clients, training_data_per_user):
-        self.mu = sum(r for (_, r) in sum(training_data_per_user.values(), [])) / max(sum(len(v) for v in training_data_per_user.values()), 1)
+    def train(self, clients, training_data_per_client):
+        # Calcular mu sobre todas las interacciones de todos los clientes
+        all_interactions = []
+        for cid, user_data in training_data_per_client.items():
+            for u, interactions in user_data.items():
+                all_interactions.extend(interactions)
 
-        for t in range(1,  self.cfg.rounds + 1):
-            random.seed(42 + t)
+        self.mu = sum(r for (_, r) in all_interactions) / max(len(all_interactions), 1)
+
+        for t in range(1, self.cfg.rounds + 1):
             selected = self._sample_clients(clients)
             updates_list = []
             for client in selected:
@@ -112,7 +110,7 @@ class FLDPServer:
                     mu=self.mu,
                     Q_items=self.Q,
                     bi_items=self.bi,
-                    training_data=training_data_per_user[client.user_id]
+                    training_data=training_data_per_client[client.client_id]
                 )
                 updates_list.append(uploads)
 
