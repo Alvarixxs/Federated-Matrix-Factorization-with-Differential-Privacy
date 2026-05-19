@@ -13,7 +13,6 @@ from src.utils.experiments import build_base_path
 
 
 def assign_users_to_clients(n_users: int, n_clients: int, seed: int):
-    """Asigna n_users usuarios a n_clients clientes de forma aleatoria."""
     random.seed(seed)
     user_ids = list(range(n_users))
     random.shuffle(user_ids)

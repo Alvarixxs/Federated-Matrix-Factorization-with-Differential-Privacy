@@ -1,5 +1,3 @@
-# src/scripts/collect_dp_results.py
-
 import json
 import os
 import argparse
