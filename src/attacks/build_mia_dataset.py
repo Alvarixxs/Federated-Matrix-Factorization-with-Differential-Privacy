@@ -10,11 +10,6 @@ from src.utils.evaluation import (
 
 
 def stratified_manual_split(df, test_frac, seed):
-    """
-    Manual stratified split without sklearn.
-    Keeps label balance.
-    """
-
     rng = np.random.default_rng(seed)
 
     train_parts = []
@@ -43,21 +38,17 @@ def stratified_manual_split(df, test_frac, seed):
 def main(args):
     base_path = build_base_path(args, args.model)
 
-    # Load features
     df_in = load_mia_features(base_path, "mia_in")
     df_out = load_mia_features(base_path, "mia_out")
 
-    # Concatenate safely (no .append)
     df = pd.concat([df_in, df_out], ignore_index=True)
 
-    # Manual stratified split
     train_df, test_df = stratified_manual_split(
         df,
         test_frac=args.test_frac,
         seed=args.seed
     )
 
-    # Save everything
     save_mia_dataset(base_path, df, train_df, test_df)
 
 

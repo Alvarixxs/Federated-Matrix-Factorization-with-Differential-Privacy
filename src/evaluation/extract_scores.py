@@ -7,10 +7,6 @@ from src.utils.experiments import build_base_path
 from src.utils.evaluation import save_mia_features
 
 
-# -------------------------------------------------
-# Feature computation
-# -------------------------------------------------
-
 def compute_features(P, Q, bu, bi, mu, data, label, reg):
     rows = []
 
@@ -32,19 +28,12 @@ def compute_features(P, Q, bu, bi, mu, data, label, reg):
     return rows
 
 
-# -------------------------------------------------
-# Main
-# -------------------------------------------------
-
 def main(args):
     base_path = build_base_path(args, args.model)
 
     # Load trained model
     P, Q, bu, bi, mu, _ = load_model(base_path)
 
-    # ---------------------------
-    # MIA IN (label=1)
-    # ---------------------------
     mia_in_data = load_mia_in(args.dataset)
     features_in = compute_features(
         P, Q, bu, bi, mu,
@@ -54,9 +43,6 @@ def main(args):
     )
     save_mia_features(base_path, features_in, split="mia_in")
 
-    # ---------------------------
-    # MIA OUT (label=0)
-    # ---------------------------
     mia_out_data = load_mia_out(args.dataset)
     features_out = compute_features(
         P, Q, bu, bi, mu,
@@ -81,7 +67,6 @@ if __name__ == "__main__":
     ap.add_argument("--reg", type=float, required=True)
     ap.add_argument("--rounds", type=int, required=True)
 
-    # DP (optional, needed for path resolution)
     ap.add_argument("--noise_multiplier", type=float)
 
     args = ap.parse_args()

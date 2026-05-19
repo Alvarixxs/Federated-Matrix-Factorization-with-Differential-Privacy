@@ -7,16 +7,7 @@ from src.utils.experiments import build_base_path
 from src.utils.evaluation import load_mia_dataset, save_attack_results
 
 
-# -------------------------------------------------
-# Threshold search
-# -------------------------------------------------
-
 def find_best_threshold(scores, labels):
-    """
-    Finds threshold that maximizes accuracy on training set.
-    Lower score = more member-like (for error feature).
-    """
-
     thresholds = np.unique(scores)
     best_acc = 0.0
     best_t = thresholds[0]
@@ -32,10 +23,6 @@ def find_best_threshold(scores, labels):
     return best_t, best_acc
 
 
-# -------------------------------------------------
-# Main
-# -------------------------------------------------
-
 def main(args):
     base_path = build_base_path(args, args.model)
     train_df, test_df = load_mia_dataset(base_path)
@@ -48,19 +35,11 @@ def main(args):
     test_scores = test_df[feature].values
     test_labels = test_df["label"].values
 
-    # -------------------------------------------------
-    # Learn threshold on training data
-    # -------------------------------------------------
     threshold, train_acc = find_best_threshold(train_scores, train_labels)
 
-    # -------------------------------------------------
-    # Evaluate on test
-    # -------------------------------------------------
     test_preds = (test_scores <= threshold).astype(int)
     test_acc = accuracy_score(test_labels, test_preds)
 
-    # For AUC: convert to member-like score
-    # If feature is "error", smaller = more member-like
     if feature == "error":
         member_scores = -test_scores
     else:
